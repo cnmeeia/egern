@@ -1,40 +1,56 @@
 const { exec } = require('child_process');
 
-/**
- * 获取指定挂载点的磁盘使用率
- * @param {string} path - 挂载路径，默认为根目录 '/'
- * @returns {Promise<string>} - 返回百分比字符串，例如 '45%'
- */
-function getDiskUsage(path = '/') {
-    return new Promise((resolve, reject) => {
-        // 使用 df -h 命令查看磁盘空间
-        // grep 过滤出对应路径的行
-        // awk '{print $5}' 提取第5列（即 Use%）
-        const command = `df -h "${path}" | tail -1 | awk '{print $5}'`;
+const VOLS = ['/vol1', '/vol3'];
+const INTERVAL = 30 * 60 * 1000; // 30分钟
 
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`执行出错: ${error.message}`);
-                return reject(error);
+function getVolUsage() {
+    return new Promise((resolve, reject) => {
+        exec(`df -P ${VOLS.join(' ')}`, (err, stdout) => {
+            if (err) return reject(err);
+
+            const lines = stdout.trim().split('\n');
+            const result = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(/\s+/);
+
+                result.push({
+                    mount: cols[5],
+                    usage: cols[4],
+                    size: cols[1],
+                    used: cols[2],
+                    available: cols[3],
+                });
             }
-            if (stderr) {
-                console.error(`命令错误: ${stderr}`);
-                return reject(stderr);
-            }
-            // 去除换行符并返回
-            resolve(stdout.trim());
+
+            resolve(result);
         });
     });
 }
 
-// 使用示例
-(async () => {
+async function checkDisk() {
     try {
-        const usage = await getDiskUsage('/');
-        console.log(`当前磁盘使用率: ${usage}`);
-    } catch (err) {
-        console.error('获取磁盘信息失败');
-    }
-})();
+        const data = await getVolUsage();
 
-module.exports = getDiskUsage;
+        console.log(`\n📊 [${new Date().toLocaleString()}] 磁盘状态：`);
+
+        data.forEach(v => {
+            const percent = parseInt(v.usage);
+
+            console.log(`${v.mount} -> ${v.usage} (used: ${v.used} / total: ${v.size})`);
+
+            if (percent >= 80) {
+                console.log(`🚨 WARNING: ${v.mount} 使用率过高！`);
+            }
+        });
+
+    } catch (err) {
+        console.error('❌ 获取磁盘信息失败:', err.message);
+    }
+}
+
+// 立即执行一次
+checkDisk();
+
+// 每30分钟执行一次
+setInterval(checkDisk, INTERVAL);
