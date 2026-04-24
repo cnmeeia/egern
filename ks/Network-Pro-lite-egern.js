@@ -24,8 +24,14 @@ export default async function(ctx) {
     gemini: false,
   };
 
+  // iOS 26 透明主题适配：
+  // true  = 不绘制小组件自身背景，让系统透明主题/毛玻璃背景生效。
+  // false = 使用下方 fallbackBg 半透明背景，适合透明背景失效或文字可读性差时。
+  const USE_TRANSPARENT_BACKGROUND = true;
+  const fallbackBg = { light: '#FFFFFFCC', dark: '#121212CC' };
+
   const C = {
-    bg: { light: '#FFFFFF', dark: '#121212' },
+    bg: fallbackBg,
     barBg: { light: '#0000001A', dark: '#FFFFFF22' },
     text: { light: '#1C1C1E', dark: '#FFFFFF' },
     dim: { light: '#8E8E93', dark: '#8E8E93' },
@@ -388,7 +394,7 @@ export default async function(ctx) {
   return {
     type: 'widget',
     padding: 14,
-    backgroundColor: C.bg,
+    ...(USE_TRANSPARENT_BACKGROUND ? {} : { backgroundColor: C.bg }),
     children: [
       {
         type: 'stack',
